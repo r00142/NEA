@@ -35,11 +35,11 @@ Once I implemented a variable length data type into my structure parser, I was a
 
 Next, using this data and the file I had, I started to implement two basic functions - one which would return a list of the file contents of lump 40, and one which would copy the entire lump to an external zip file (as the formats are nearly identical with no compression). The former was quite simple and just involved a While loop going through until until the ZIP_EndOfCentralDirRecord is encountered (signalling the end of the lump structure).  The latter simply wrote the entire contents of the lump to a zip file.
 
-A more permanent solution will be implemented later for this, as I dislike how it breaks out of the while loop upon encountering a non-localfileheader object; I currently have no use for the ZIP_FileHeader objects (they simply contain a list of the file names present in the lump and references to their locations), nor the ZIP_EOCDR object present at the file's end. I'll likely need to use these when constructing my own lump 40s for packing, however that will be detailed later in this chapter.
+Originally I had no system implemented to parse the end-of-file structures, however I decided to implement this so that I could access individual items in the lump more easily. This meant instead of using an iterative approach for my parse_l40_getcontents() method, it would read back from the end of the file to retrieve data on the ZIP_FileHeader objects.
 
-*Methods for returning an array of all items present in the lump, and for extracting all contents to a zip file.*![""](https://r00142.s-ul.eu/nea-bak/Duw1r886)
+*Original methods for returning an array of all items present in the lump, and for extracting all contents to a zip file.*![""](https://r00142.s-ul.eu/nea-bak/Duw1r886)
 
-
+*Updated parse_l40_getcontents to utilise the ZIP_EOCDR and ZIP_FH objects instead of iteratively parsing the whole file. This just as easily prints off file names, size, etc without having to crawl through all file data*![""](https://r00142.s-ul.eu/nea-bak/XZFIkxmy)*Output of this is unchanged from before*![""](https://r00142.s-ul.eu/nea-bak/W8daODl7)
 
 ---
 

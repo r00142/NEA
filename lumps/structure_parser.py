@@ -11,8 +11,7 @@ class Datatype(Enum):
     CHAR = 1  #char
     FLOAT = 4  #float
     LONG = 8 #long
-    CONST = -1 #constant
-    VARLEN = -1 #variable length field
+    CONST = -1 #constant, X must equal this
 
 class Flags(Enum):
     SUB = 0 #substruct
@@ -21,8 +20,8 @@ class Flags(Enum):
     UB = 3 #unsigned big
     SB = 4 #signed big
     CN = 5 #constant
-    ARR = 6 #array of basic datatypes
-    VAR = 7 #variable length field
+    ARR = 6 #array of basic datatypes of a fixed length
+    VAR = 7 #variable length field, set to the value of another item (int or short)
 
 class StructError(Exception):
     '''Error within a structure definition
@@ -60,7 +59,7 @@ class Struct():
                     length += substruct_size*substruct_repeats
 
                 elif flagident == "VAR": #varlen
-                    length += int(typeident.split("/")[1])
+                    pass #varlen has no defined length at first
                     
             self.__structlendict[struct_name] = length
             
@@ -90,9 +89,8 @@ class Struct():
                         try:
                             if int(item[1].split("/")[1]) < 1: #if an invalid substruct
                                 raise StructError("Invalid amount of substructs in \"%s\": \"%s\"" %(name, item[1]))
-                        except:
-                            if isinstance(item[1].split("/")[0], float): #floats not allowed
-                                raise StructError("Invalid amount of substructs in \"%s\": \"%s\"" %(name, item[1]))
+                        except: #originally no floats, now no chars etc
+                            raise StructError("Invalid amount of substructs in \"%s\": \"%s\"" %(name, item[1]))
 
                     elif item[2] == "SUB"and item[1].split("/")[0] not in self.__structdict: #if an invalid substruct
                         raise StructError("Invalid substruct specified in \"%s\": Substruct \"%s\"" %(name, item[1].split("/")[0]))
@@ -115,6 +113,16 @@ class Struct():
                     elif item[2] == "VAR" and item[1].split("/")[0] not in ["RAW", "STR"]: #invalid array
                         raise StructError("Invalid type specified in \"%s\": variable length field \"%s\" - must be RAW or STR" %(name, item[1]))
 
+                    elif item[2] == "VAR": #varlen without a valid field to link to
+                        is_valid = False
+                        for item_definition in struct_tuple:
+                            if item[1].split("/")[1] == item_definition[0]:
+                                is_valid = True
+                            elif item[0] == item_definition[0]:
+                                break
+                        if not is_valid:
+                            raise StructError("Invalid field specified in \"%s\": variable length field \"%s\" does not have a previous valid field linking to it"%(name, item[1]))
+                    
                 self.__structdict[name] = struct_tuple
                 self.__structlendict[name] = -1 #defined in lencalc
 
@@ -187,7 +195,7 @@ class Struct():
 
                     elif flagident == "VAR": #variable length
                         varlen_typeident = typeident.split("/")[0]
-                        varlen_len = int(typeident.split("/")[1])
+                        varlen_len = output[typeident.split("/")[1]]
                         
                         if varlen_typeident == "RAW": #raw binary
                             output[nameident] = data[:varlen_len]

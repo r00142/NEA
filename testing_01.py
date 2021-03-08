@@ -78,25 +78,27 @@ class TestStructs(unittest.TestCase):
         self.assertEqual(self.StructMaster.getlen("mainstruct02"), 1036)
 
     def test_varlen_raw(self):
-        x = (("INT", "INT", "UL"),
-             ("varlen", "RAW/8", "VAR"))
+        x = (("integer", "INT", "UL"),
+             ("varlen", "RAW/integer", "VAR"))
         self.StructMaster.new_struct("varlenstruct01", x)
 
-        data = b"\x04\x01\x00\x00\x10\x20\x40\x80\x01\x02\x04\x08"
+        data = b"\x08\x00\x00\x00\x10\x20\x40\x80\x01\x02\x04\x08"
         #260, b"\x10\x20\x40\x80\x01\x02\x04\x08" in hex
 
         self.assertEqual(self.StructMaster.parse(data, "varlenstruct01"),
-                        {'varlenstruct01': {'INT': 260, 'varlen': b'\x10\x20\x40\x80\x01\x02\x04\x08'}})
+                        {'varlenstruct01': {'integer': 8, 'varlen': b'\x10\x20\x40\x80\x01\x02\x04\x08'}})
 
     def test_varlen_str(self):
-        x = (("varlen", "STR/8", "VAR"),)
+        x = (("integer", "INT", "UL"),
+             ("varlen", "STR/integer", "VAR"),
+             ("varlen2", "STR/integer", "VAR"))
         self.StructMaster.new_struct("varlenstruct02", x)
 
-        data = b"\x54\x4d\x50\x54\x58\x54\x31\x32"
+        data = b"\x04\x00\x00\x00\x54\x4d\x50\x54\x58\x54\x31\x32"
         #TMPTXT12 in hex
 
         self.assertEqual(self.StructMaster.parse(data, "varlenstruct02"),
-                        {'varlenstruct02': {'varlen': 'TMPTXT12'}})
+                        {'varlenstruct02': {'integer': 4,'varlen': 'TMPT','varlen2': 'XT12'}})
     
 
 if __name__ == "__main__":

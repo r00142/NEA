@@ -3,13 +3,15 @@ from structure_parser import *
 
 
 class L40Parser():
-    def __init__(self, bsp):
-        self.__HeaderMaster = HeaderParser(bsp)
+    def __init__(self, bsp_path):
+        self.__HeaderMaster = HeaderParser(bsp_path)
         self.__headerdata = self.__HeaderMaster.get_header_data()
         
-        self.__l40_offset =self.__headerdata["header"]["lumps"][40]["fileofs"]
+        self.__l40_offset = self.__headerdata["header"]["lumps"][40]["fileofs"]
         self.__l40_len = self.__headerdata["header"]["lumps"][40]["filelen"]
-        with open(bsp, "rb") as bsp_file:
+        del self.__HeaderMaster # no further use for this HeaderParser object
+        
+        with open(bsp_path, "rb") as bsp_file:
             self.__l40_data = bsp_file.read()
             self.__l40_data = self.__l40_data[self.__l40_offset:self.__l40_offset+self.__l40_len]
 
@@ -17,18 +19,18 @@ class L40Parser():
 
         #### Creating structures - ZIP_EndOfCentralDirRecord, ZIP_FileHeader, ZIP_LocalFileHeader
         self.__StructMaster = Struct()
-        #ZIP_EndOfCentralDirRecord
+        #ZIP_EndOfCentralDirRecord definition
         self.__ZEOCDR = (("signature", "CONST/PK\x05\x06", "CN"), ## PK56
-                  ("numberOfThisDisk", "SHORT", "UL"),
-                  ("numberOfTheDiskWithStartOfCentralDirectory", "SHORT", "UL"),
-                  ("nCentralDirectoryEntries_ThisDisk", "SHORT", "UL"),
-                  ("nCentralDirectoryEntries_Total", "SHORT", "UL"),
-                  ("centralDirectorySize", "INT", "UL"),
-                  ("startOfCentralDirOffset", "INT", "UL"),
-                  ("commentLength", "SHORT", "UL"))
-                ## comment follows
+                ("numberOfThisDisk", "SHORT", "UL"),
+                ("numberOfTheDiskWithStartOfCentralDirectory", "SHORT", "UL"),
+                ("nCentralDirectoryEntries_ThisDisk", "SHORT", "UL"),
+                ("nCentralDirectoryEntries_Total", "SHORT", "UL"),
+                ("centralDirectorySize", "INT", "UL"),
+                ("startOfCentralDirOffset", "INT", "UL"),
+                ("commentLength", "SHORT", "UL"),
+                ("comment", "STR/commentLength", "VAR"))
 
-        #ZIP_FileHeader
+        #ZIP_FileHeader definition
         self.__ZFH = (("signature", "CONST/PK\x01\x02", "CN"), ## PK12
                ("versionMadeBy", "SHORT", "UL"),
                ("versionNeededToExtract", "SHORT", "UL"),
@@ -45,10 +47,12 @@ class L40Parser():
                ("diskNumberStart", "SHORT", "UL"),
                ("internalFileAttribs", "SHORT", "UL"),
                ("externalFileAttribs", "INT", "UL"),
-               ("relativeOffsetOfLocalHeader", "INT", "UL"))
-                ## folloewd by file name, extra field, and file comment - all variable field len
+               ("relativeOffsetOfLocalHeader", "INT", "UL"),
+               ("fileName", "STR/fileNameLength", "VAR"),
+               ("extraField", "STR/extraFieldLength", "VAR"),
+               ("fileComment", "STR/fileCommentLength", "VAR"))
 
-        #ZIP_LocalFileHeader
+        #ZIP_LocalFileHeader definition
         self.__ZLFH = (("signature", "CONST/PK\x03\x04", "CN"), ## PK34
                ("versionNeededToExtract", "SHORT", "UL"),
                ("flags", "SHORT", "UL"),
@@ -59,37 +63,47 @@ class L40Parser():
                ("compressedSize", "INT", "UL"),
                ("uncompressedSize", "INT", "UL"),
                ("fileNameLength", "SHORT", "UL"),
-               ("extraFieldLength", "SHORT", "UL"))
-                ## followed by file name, extra field - all variable field len
+               ("extraFieldLength", "SHORT", "UL"),
+               ("fileName", "STR/fileNameLength", "VAR"),
+               ("extraField", "STR/extraFieldLength", "VAR"))
+
 
         self.__StructMaster.new_struct("ZIP_EndOfCentralDirRecord", self.__ZEOCDR)
         self.__StructMaster.new_struct("ZIP_FileHeader", self.__ZFH)
         self.__StructMaster.new_struct("ZIP_LocalFileHeader", self.__ZLFH)
 
-        ## print(self.__StructMaster.parse(self.__l40_data, "ZIP_LocalFileHeader"))
+
+
+
 
     def parse_l40_getcontents(self): #returns an array of the contents
         l40_data_copy = self.__l40_data
+        l40_zeocdr_len = self.__StructMaster.getlen("ZIP_EndOfCentralDirRecord")+32 #plus comment len
         output = []
+        
+        ## PARSING THE ZEOCDR ##
+        l40_zeocdr = self.__StructMaster.parse(l40_data_copy[-l40_zeocdr_len:],
+                                                   "ZIP_EndOfCentralDirRecord")#zfh array begins at "startOfCentralDirOffset" from the lump's start
+        offset = 0
 
-        while True:
-            if l40_data_copy[:4] == b"PK\x03\x04": #zip local file header
-                l40_parsed = self.__StructMaster.parse(l40_data_copy, "ZIP_LocalFileHeader") #parsed to allow easy indexing
-                fcompr_len = l40_parsed["ZIP_LocalFileHeader"]["compressedSize"] #compressed file contents len
-                fname_len = l40_parsed["ZIP_LocalFileHeader"]["fileNameLength"] #filename len
-                efield_len = l40_parsed["ZIP_LocalFileHeader"]["extraFieldLength"] #extra field len
-                l40_data_copy = l40_data_copy[self.__StructMaster.getlen("ZIP_LocalFileHeader"):]
-                
-                fname = l40_data_copy[:fname_len].decode() #filename
-                efield = l40_data_copy[fname_len:fname_len+efield_len].decode() #extra field
-                l40_data_copy = l40_data_copy[fname_len+efield_len+fcompr_len:] #amending data used
+        l40_ncentraldirentries = l40_zeocdr["ZIP_EndOfCentralDirRecord"]["nCentralDirectoryEntries_Total"]
+        l40_centraldiroffset = l40_zeocdr["ZIP_EndOfCentralDirRecord"]["startOfCentralDirOffset"]
 
-                print("file %s found in BSP" %(fname))
-                output.append({"filename":fname, "extra field":efield, "size":fcompr_len})
-                
-            else:
-                print("non-ZLFH struct found, magic number was instead %s" %l40_data_copy[:4])
-                return output
+        ## PARSING THE ZFH ARRAY ##
+        for x in range(0,l40_ncentraldirentries ):
+            zfh = self.__StructMaster.parse(l40_data_copy[
+                                int(l40_centraldiroffset)+offset : -l40_zeocdr_len],
+                                "ZIP_FileHeader")
+            output.append(zfh)
+
+            zfh_fnlen = zfh["ZIP_FileHeader"]["fileNameLength"] #filename length
+            zfh_eflen = zfh["ZIP_FileHeader"]["extraFieldLength"] #extra field len
+            zfh_fclen = zfh["ZIP_FileHeader"]["fileCommentLength"] #file comment len
+            zfh_size = self.__StructMaster.getlen("ZIP_FileHeader") + zfh_fnlen + zfh_eflen + zfh_fclen
+
+            offset += zfh_size
+            
+        return output
 
             
     def parse_l40_getzip(self): #writes all contents to a zip file
@@ -109,7 +123,11 @@ class L40Parser():
 if __name__ == "__main__":
     bsp_path = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Team Fortress 2\\tf\\maps\\lump40_format_testing.bsp"
     Lump40Parser = L40Parser(bsp_path)
-    Lump40Parser.parse_l40_getcontents()
+    for x in Lump40Parser.parse_l40_getcontents():
+        print(x["ZIP_FileHeader"]["fileName"])
+
+        
+
     ## Lump40Parser.parse_l40_getzip()
 
 
