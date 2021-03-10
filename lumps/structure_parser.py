@@ -11,7 +11,6 @@ class Datatype(Enum):
     CHAR = 1  #char
     FLOAT = 4  #float
     LONG = 8 #long
-    CONST = -1 #constant, X must equal this
 
 class Flags(Enum):
     SUB = 0 #substruct
@@ -41,7 +40,7 @@ class Struct():
                 typeident = self.__structdict[struct_name][dtype][1] #the type (e.g. CONST/ABC, FLOAT)
                 flagident = self.__structdict[struct_name][dtype][2] #the flag(e.g. CN, UL)
                 
-                if typeident in Datatype.__members__ and flagident not in ["CN", "SUB", "ARR"]: #normal types
+                if typeident in Datatype.__members__ and flagident not in ["CN", "SUB", "ARR", "VAR"]: #normal types
                     length += Datatype[typeident].value
                     
                 elif flagident == "CN": #constant
@@ -67,16 +66,27 @@ class Struct():
         def new_struct(self, name, struct_tuple):
                 '''Pass the struct's name and a 2d tuple of values into this
                 Second level should look like (name, type, flags)
-                Type can be one of the following:
-                INT, LONG, SHORT, CHAR, FLOAT, CONST/<value>,
-                <basic type>/<repeats> (with flag ARR), <raw/str>/<length> (with flag VAR), or <SUBSTRUCT NAME>/<repeats>
-                Flags can be SUB (substruct), CN for constants, ARR for arrays, VAR for VARLEN, or UL/SL/UB/SB for (Un)Signed, Little/Big endian
-                Substructs MUST have the SUB flag set, no other datatypes should have this
-                Constants and null must have the CN flag set, no others should have this
-                Var len fields must have VARR (raw binary) or VARS (string) set.
+                
+                Datatypes:
+                |datatype | data field format | special flags | notes |           
+                |---------|-------------------|---------------|-------|
+                | INT | <integer> | None | Basic type |
+                | LONG | <integer> | None | Basic type |
+                | SHORT | <integer> | None | Basic type |
+                | CHAR | <single char> | None | Basic type |
+                | FLOAT | <float> | None | Basic type |
+                | CONST | CONST/<constant> | CN | For constant values |
+                | SUBSTRUCT | <substruct>/<repeats> | SUB | For substructures |
+                | ARRAY | <basic type>/<repeats> | ARR | For arrays of basic types |
+                | VARLEN |<RAW/STR>/<previous field> | VAR | For variable length - raw is binary, str is string data |
+                All basic types use one of the flags UL/SL/UB/SB for (un)signed, little/big endian
+                Type-specific flags should not be mixed, care must be taken to keep the proper format for data fields.
+                
                 Example struct defintion:
                 main_struct=(("value01", "FLOAT", "SL"),
-                    ("value02", "substruct/24", "SUB"))
+                    ("value02", "substruct/24", "SUB"),
+                    ("value03", "CONST/"ABCD", "CN"))
+                StructMaster.new_struct("Main Structure", main_struct)
                 '''
                 for item in struct_tuple: ##checking if it is a valid struct
                     if len(item) != 3: #if not three fields
@@ -91,6 +101,7 @@ class Struct():
                                 raise StructError("Invalid amount of substructs in \"%s\": \"%s\"" %(name, item[1]))
                         except: #originally no floats, now no chars etc
                             raise StructError("Invalid amount of substructs in \"%s\": \"%s\"" %(name, item[1]))
+                        ## FIX THIS LATER - SUBSTRUCTS CAN DRAW OFF of OTHER VARIABLE CONTENTS LIKE VARLENS##
 
                     elif item[2] == "SUB"and item[1].split("/")[0] not in self.__structdict: #if an invalid substruct
                         raise StructError("Invalid substruct specified in \"%s\": Substruct \"%s\"" %(name, item[1].split("/")[0]))
@@ -99,19 +110,19 @@ class Struct():
                         raise StructError("Invalid flag specified in \"%s\": \"%s\"" %(name, item[2]))
 
                     elif name in self.__structdict: #name exists already
-                        raise StructError("Invalid name \"%s\": \"%s\" already exists" %(name, name))
+                        raise StructError("Invalid substruct name \"%s\": already exists in structure dictionary" %(name, name))
 
                     elif "/" not in item[1] and item[2] in ["SUB", "CN", "ARR","VAR"]: #incorrectly formatted const/substruct
-                        raise StructError("Invalid const or substruct in \"%s\": \"%s\"" %(name, item[1]))
+                        raise StructError("Invalid const, substruct, array, or varlen in \"%s\": \"%s\"" %(name, item[1]))
 
                     elif item[2] == "SUB" and item[1].split("/")[1] in Datatype.__members__: #substruct called a basic datatype
                         raise StructError("Invalid substruct name in \"%s\": \"%s\" shares a basic datatype's name" %(name, item[1]))
 
-                    elif item[1].split("/")[0] not in Datatype.__members__ and item[2] == "ARR": #invalid datatype
+                    elif item[1].split("/")[0] not in Datatype.__members__ and item[2] == "ARR": #invalid array datatype
                         raise StructError("Invalid datatype specified in \"%s\": array \"%s\"" %(name, item[1]))
 
-                    elif item[2] == "VAR" and item[1].split("/")[0] not in ["RAW", "STR"]: #invalid array
-                        raise StructError("Invalid type specified in \"%s\": variable length field \"%s\" - must be RAW or STR" %(name, item[1]))
+                    elif item[2] == "VAR" and item[1].split("/")[0] not in ["RAW", "STR"]: #invalid varlen
+                        raise StructError("Invalid type specified in \"%s\": varlen \"%s\" - must be RAW or STR" %(name, item[1]))
 
                     elif item[2] == "VAR": #varlen without a valid field to link to
                         is_valid = False
@@ -121,7 +132,7 @@ class Struct():
                             elif item[0] == item_definition[0]:
                                 break
                         if not is_valid:
-                            raise StructError("Invalid field specified in \"%s\": variable length field \"%s\" does not have a previous valid field linking to it"%(name, item[1]))
+                            raise StructError("Invalid field specified in \"%s\": varlen \"%s\" does not have a previous valid field linking to it"%(name, item[1]))
                     
                 self.__structdict[name] = struct_tuple
                 self.__structlendict[name] = -1 #defined in lencalc
@@ -145,7 +156,9 @@ class Struct():
             ## Set up proper big and little endian stuff for this, and signed datatypes
             ##########
             ##########
-            ## Set up over/underflowing on the provided data
+            ## Set up over/underflowing on the provided data?
+            ## For this, potentially return -1 for too little data, 0 for exact, 1 for too much data - this would allow an easy way for end user to check which.
+            ## Field (name) + repeat that encountered no data could also be returned
             ##########
             
             output = {} #main data output
@@ -216,7 +229,7 @@ class Struct():
                             output[substruct_name] = []
                             
                         output[substruct_name]= substruct_output
-                        ### currently isnt properly creating new entries in arrays
+                        ### currently isn't properly creating new entries in arrays
 
                         
                     else: #the other datatypes
