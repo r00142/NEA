@@ -64,21 +64,21 @@ class Struct():
             
 
         def new_struct(self, name, struct_tuple):
-                '''Pass the struct's name and a 2d tuple of values into this
+                r'''Pass the struct's name and a 2d tuple of values into this
                 Second level should look like (name, type, flags)
                 
-                Datatypes:
-                |datatype | data field format | special flags | notes |           
-                |---------|-------------------|---------------|-------|
-                | INT | <integer> | None | Basic type |
-                | LONG | <integer> | None | Basic type |
-                | SHORT | <integer> | None | Basic type |
-                | CHAR | <single char> | None | Basic type |
-                | FLOAT | <float> | None | Basic type |
-                | CONST | CONST/<constant> | CN | For constant values |
-                | SUBSTRUCT | <substruct>/<repeats> | SUB | For substructures |
-                | ARRAY | <basic type>/<repeats> | ARR | For arrays of basic types |
-                | VARLEN |<RAW/STR>/<previous field> | VAR | For variable length - raw is binary, str is string data |
+                | Datatype | Data Field Format         | Special flags | Notes                                                   |           
+                |----------|---------------------------|---------------|---------------------------------------------------------|
+                | INT      | <integer>                 | None          | Basic type                                              |
+                | LONG     | <integer>                 | None          | Basic type                                              |
+                | SHORT    | <integer>                 | None          | Basic type                                              |
+                | CHAR     | <single char>             | None          | Basic type                                              |
+                | FLOAT    | <float>                   | None          | Basic type                                              |
+                | CONST    | CONST/<constant>          | CN            | For constant values                                     |
+                | SUBSTRUCT| <substruct>/<repeats>     | SUB           | For substructures                                       |
+                | ARRAY    | <basic type>/<repeats>    | ARR           | For arrays of basic types                               |
+                | VARLEN   |<RAW/STR>/<previous field> | VAR           | For variable length - raw is binary, str is string data |
+                
                 All basic types use one of the flags UL/SL/UB/SB for (un)signed, little/big endian
                 Type-specific flags should not be mixed, care must be taken to keep the proper format for data fields.
                 
