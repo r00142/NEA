@@ -5,7 +5,7 @@ except:
 
 
 
-#bsp = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Team Fortress 2\\tf\\maps\\lump40_format_testing.bsp"
+bsp = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Team Fortress 2\\tf\\maps\\lump40_format_testing.bsp"
 #bsp = "l40_testing\\lump40_format_testing.bsp"
 
 
