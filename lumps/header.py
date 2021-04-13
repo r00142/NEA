@@ -35,16 +35,16 @@ class HeaderParser():
         return self.__header_parsed.copy()
 
     def get_len(self):
-        return self.__StructMaster.getlen("header")
+        return self.__StructMaster.get_len("header")
         
     def get_all_lumpt(self):
         pass
 
     def get_single_lumpt(self):
         pass
-##
-##x = HeaderParser(bsp)
-##y = x.get_header_data()
-##print(y)
-##
-##print(x.get_len())
+
+x = HeaderParser(bsp)
+y = x.get_header_data()
+print(y)
+
+print(x.get_len())
