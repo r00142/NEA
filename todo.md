@@ -1,3 +1,11 @@
 TODO:
 - Implement several functions into structure parser: AddKeyPair, DeleteKeyPair, UpdateKeyPair, DeleteStruct, UpdateStruct
 - Clean up structure parser library code (e.g. check the usage of enums, define 'special' vs 'basic' types in dicts, define \__all__, etc)
+- Update all formatting to remove flags. They can be integrated into the main value:
+- - This would look like:
+  - \<INT/SHORT/LONG/FLOAT/CHAR>\<SB/SL/UB/UL> (e.g. INTUL)
+  - Special types would be:
+  - Array = \<BASIC TYPE>\<FLAG>/\<REPEATS>
+  - Substruct = \<SUBSTRUCT>/\<REPEATS>
+  - Constants = \<VALUE>
+  - Varlen = \<OTHER FIELD>/<RAW/STR>
