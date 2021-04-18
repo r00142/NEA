@@ -20,38 +20,44 @@ class Struct():
             self.__struct_dict = {} #dictionary of all the structure object's structs
             self.__struct_len_dict = {} #dictionary of all the structure object's structs' lengths
             self.__basic_types = __Datatype
-            self.__basic_flags = ("UL", "UB", "SL", "SB")
-            self.__special_flags = ("SUB", "CN", "ARR", "VAR")
-            #sub = substruct, arr = array of basic datatypes (fixed length), var = variable length, CN = constant
-            #U/S = Un(signed), B/L = big/little
+            self._basic_types_members = self.__Datatype.__members__
+            self.__basic_flags = ["UL", "SL", "UB", "SB"]
             
         def __lencalc(self, struct_name):
             length = 0
 
-            for dtype in range(len(self.__struct_dict[struct_name])):
-                typeident = self.__struct_dict[struct_name][dtype][1] #the type (e.g. CONST/"ABC", FLOAT, "SUBSTRUCT"/12)
-                flagident = self.__struct_dict[struct_name][dtype][2] #the flag (e.g. CN, UL)
-                
-                if typeident in self.__basic_types.__members__ and flagident in self.__basic_flags: #normal types
-                    length += self.__basic_types[typeident].value
-                    
-                elif flagident == "CN": #constant
-                    length += len(typeident.split("/")[1])
+            for dtype in range(len(self.__struct_dict[struct_name])):     
+                typeident = self.__struct_dict[struct_name][dtype][1] #the type (e.g. CONST/"ABC", "FLOAT", "SUBSTRUCT"/12)
+                is_basic_type = typeident[-2:] in self.__basic_flags and
+                                len(typeident.split("/") == 1 #if it uses <value><flag> formatting, and isn't an array
 
-                elif flagident == "ARR": #array
-                    array_type_len = self.__basic_types[typeident.split("/")[0]].value #length of the defined basic type
-                    array_repeats = int(typeident.split("/")[1]) #repeats of the basic type
-                    length += array_type_len * array_repeats
-                    
-                elif flagident == "SUB": #substruct
-                    substruct = typeident.split("/")[0] #substruct name
-                    substruct_size = self.get_len(substruct) #length of the substruct, auto lencalcs if not defined
-                    substruct_repeats = int(typeident.split("/")[1]) #amount of repeats of the struct
+                if not(is_basic_type) and len(typeident.split("/") > 1: #for most special types (not consts)
+                    data1, data2 = typeident.split("/") #data1 for substructs/arrays/etc, data2 for repeats/varlen type
+                elif is_basic_type: #basic types
+                    data1 = typeident[:-2] #data1 for types (all we care about for length) - this is up to (not incl) flags
 
-                    length += substruct_size * substruct_repeats
+                if is_basic_type: #basic type
+                    length += self.__basic_types[data1].value #enum value for the datatype part
 
-                elif flagident == "VAR": #varlen
-                    pass #varlen has no defined length at first
+                else:
+                    elif len(typeident.split("/") == 1: #constant
+                        length += len(typeident)
+                                   
+                    elif data1[:-2] in self._basic_types_members: #array
+                        array_type_len = self.__basic_types[ data1[:-2] ].value #length of the type used (bytes)
+                        array_repeats = int(data2) #repeats of the basic type
+                        length += array_type_len * array_repeats
+
+                    ##
+                    elif not(is_basic_type) and data1 in self.__struct_dict: #substruct
+                        #data1 =  substruct name, data2 = repeats
+                        substruct_size = self.get_len(data1) #length of the substruct, auto lencalcs if not defined
+                        substruct_repeats = int(data2) #amount of repeats of the struct
+                        length += substruct_size * substruct_repeats
+                    ##
+
+                    elif data2 == "STR" or data2 == "RAW": #varlen
+                        pass #varlen has no defined length at first
                     
             self.__struct_len_dict[struct_name] = length
 
